@@ -1,0 +1,38 @@
+# CMake 构建生成文件
+build/
+build-*/
+cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+*.cmake
+!CMakeLists.txt
+
+# GCC 编译中间产物与固件
+*.o
+*.obj
+*.a
+*.lib
+*.elf
+*.bin
+*.hex
+*.map
+*.lst
+*.d
+*.su
+
+# 调试与临时文件
+*.dbg
+.gdb_history
+*.log
+
+# 编辑器与IDE配置
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 系统临时文件
+Thumbs.db
+.DS_Store

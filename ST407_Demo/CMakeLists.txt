@@ -1,0 +1,85 @@
+# =====================================================================
+#  STM32F407 寄存器版工程总装脚本
+#  职责：把 BSP / Core / CMSIS 装进一个可执行文件，并产出 hex/bin
+# =====================================================================
+
+# 第 1 步：CMake 最低版本
+cmake_minimum_required(VERSION 3.20)
+
+# 第 2 步：注册工具函数所在目录（include(modules) 能找得到）
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(modules)
+
+# 第 3 步：读取芯片参数（CHIP 唯一真源在这里面）
+include(chip)
+
+# 第 4 步：工程定义
+#   LANGUAGES C ASM 不能少——ASM 让 .s 启动文件被正确编译
+project(STM32F407_Register
+    VERSION 1.0.0
+    LANGUAGES C ASM)
+
+# 第 5 步：没指定构建类型时默认 Debug
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
+endif()
+
+# 第 6 步：全局编译选项
+# ---- 路径前缀重映射：把工程根(可能含中文，如"项目")替换成相对名 "." ----
+#   作用（实测注意：gcc 主文件名诊断【不受】此选项影响，终端里警告/错误
+#   路径的 GBK 乱码由 cmake/sccache.bat + gcc_utf8_wrapper.py 转码解决）：
+#   1) __FILE__ 宏、assert/日志里的文件名变成相对路径，不暴露本机用户名目录；
+#   2) DWARF 调试信息与构建目录解耦，换机器/换目录路径仍一致（可复现构建）。
+file(TO_CMAKE_PATH "${CMAKE_SOURCE_DIR}" _PROJECT_ROOT_CANON)
+add_compile_options(-ffile-prefix-map=${_PROJECT_ROOT_CANON}=.)
+
+add_compile_options(
+    -Wall -Wextra                       # 打开警告（自己的代码建议全清掉）
+    -fdata-sections -ffunction-sections # 每个函数/变量单独成段
+    $<$<CONFIG:Debug>:-Og>               # -Og: 专门为调试优化的等级
+    $<$<CONFIG:Debug>:-g3>               # -g3: 连宏定义都能在调试器里展开
+    $<$<CONFIG:Release>:-Os>             # 发布版以体积最小为目标
+)
+
+# 第 7 步：引入 BSP 子目录（产出 bsp、cmsis 两个目标）
+add_subdirectory(BSP)
+
+# 第 8 步：可执行文件 = main.c + 启动文件 + system 文件
+#   注意：启动文件和 system 文件是"芯片层"的，直接编进最终固件
+add_executable(${PROJECT_NAME}
+    App/main.c
+    ${STARTUP_FILE}                                          # 向量表
+    ${CMAKE_SOURCE_DIR}/Core/System/system_${STM32_FAMILY_LC}xx.c)  # SystemInit
+
+# 第 9 步：链接关系
+#   链接 bsp 会自动带入 cmsis 的头文件路径/器件宏/HSE_VALUE
+#   -T 指定链接脚本（由 chip.cmake 自动选好）
+target_link_libraries(${PROJECT_NAME} PRIVATE
+    bsp
+    -T${LDSCRIPT}
+    -lc -lm -lnosys          # C 库 + 数学库 + 裸机空桩库
+)
+
+# 第 10 步：链接选项
+target_link_options(${PROJECT_NAME} PRIVATE
+    -nostartfiles             # 不用 GCC 默认启动代码，用 ST 的 startup_xxx.s
+    -Wl,--gc-sections         # 垃圾回收：删掉没被引用的函数/变量，省 Flash
+    -Wl,--print-memory-usage  # 链接完打印 RAM/Flash 占用百分比
+    -Wl,-Map=${CMAKE_BINARY_DIR}/${PROJECT_NAME}.map  # 生成 map 文件
+)
+
+# 第 11 步：编译后自动生成 .hex / .bin（烧录和量产要用）
+# ★ Windows + 中文路径注意★ 不能把含中文的绝对路径直接当参数传给 objcopy：
+#   Ninja 经 cmd.exe 传参时按系统 ANSI 码页编码，objcopy 的 CRT 会把
+#   "项目"解析成乱码而报 "No such file or directory"。
+#   解决：把工作目录切到产物目录，参数里只出现【纯文件名】。
+#   WORKING_DIRECTORY 由 Ninja 用 CreateProcessW 的 Unicode 接口设置，不受码页影响。
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    WORKING_DIRECTORY "$<TARGET_FILE_DIR:${PROJECT_NAME}>"
+    COMMAND ${CMAKE_OBJCOPY} -O ihex   "$<TARGET_FILE_NAME:${PROJECT_NAME}>" "${PROJECT_NAME}.hex"
+    COMMAND ${CMAKE_OBJCOPY} -O binary "$<TARGET_FILE_NAME:${PROJECT_NAME}>" "${PROJECT_NAME}.bin"
+    COMMENT "Generating hex / bin")
+print_size(${PROJECT_NAME})   # 打印体积
+
+# 第 12 步：OpenOCD 烧录/调试目标（DAP 配置，见 openocd.cmake）
+include(openocd)
