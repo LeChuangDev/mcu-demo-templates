@@ -1,0 +1,29 @@
+# ===== 构建输出目录（debug/release 两套产物都在 build/ 下）=====
+build/
+CMakeUserPresets.json
+
+# ===== 编译中间文件与固件产物 =====
+*.o
+*.d
+*.su
+*.map
+*.list
+*.elf
+*.hex
+*.bin
+*.dis
+*.lst
+
+# ===== 调试器 / 编辑器 / 系统杂项 =====
+.vscode/ipch/
+*.user
+*.uvguix.*
+*.bak
+JLinkLog.txt
+openocd.log
+Thumbs.db
+.DS_Store
+
+# ===== 大体积参考资料一般不入库（需要时改成 git submodule 或 LFS）=====
+Doc/*
+!Doc/.gitkeep
