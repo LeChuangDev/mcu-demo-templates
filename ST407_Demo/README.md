@@ -88,23 +88,39 @@ App  ──►  BSP  ──►  Drivers/External(片外芯片)
 | Ninja | `C:\EmbeddedTools\ninja` |
 | OpenOCD 0.12 | `C:\EmbeddedTools\openocd-general\bin` |
 
-> 换电脑时只需修改 `cmake/arm-none-eabi.cmake`（或 `CMakePresets.json` 中的工具链路径），其他文件不动。
+> 工程文件里不写死任何工具链绝对路径：换电脑时只要把上表四个工具加进 `PATH`，
+> 就能直接编译，`cmake/arm-none-eabi.cmake` 和 `CMakePresets.json` 都不用改。
+
+## 移动 / 复制整个工程
+
+把 `ST407_Demo/` 整个文件夹复制或移动到任何位置（路径可以含空格、中文），
+**不需要修改任何配置**，直接用下面的方式编译/烧录：
+
+- VSCode：`Ctrl+Shift+B` 编译；任务“烧录 Flash”会自动先编译再烧录。
+- 命令行：
+  ```bash
+  cmake -P tools/build.cmake                    # 编译
+  cmake -DTARGET=flash -P tools/build.cmake     # 编译并烧录
+  ```
+
+`tools/build.cmake` 每次构建前都会核对 `build/debug/CMakeCache.txt` 里记录的工程路径：
+目录变了就自动删除旧缓存、重新执行 `cmake --preset debug`，然后正常增量编译。
+因此 `build/` 可以跟着文件夹一起拷贝，不会因为旧绝对路径而报错。
+
+> 只有绕开该脚本、直接执行 `cmake --build build/debug` 时，移动目录后才需要手动删除 `build/`。
 
 ## 常用命令（CMake 文件就绪后）
 
 ```bash
-# 配置（debug / release 两种预设，二进制目录隔离）
+# 配置（首次，或改动 CMakeLists / 新增源文件后）
 cmake --preset debug
-cmake --preset release
 
 # 编译
 cmake --build build/debug
-cmake --build build/release
 
-# 烧录 / 校验 / 解除读保护 / 起 GDB Server
+# 烧录 / 复位 / 起 GDB Server
 cmake --build build/debug --target flash
-cmake --build build/debug --target verify
-cmake --build build/debug --target unlock
+cmake --build build/debug --target reset
 cmake --build build/debug --target debug_server
 ```
 

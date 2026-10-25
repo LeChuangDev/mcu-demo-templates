@@ -54,9 +54,15 @@ add_executable(${PROJECT_NAME}
 # 第 9 步：链接关系
 #   链接 bsp 会自动带入 cmsis 的头文件路径/器件宏/HSE_VALUE
 #   -T 指定链接脚本（由 chip.cmake 自动选好）
+#   ★ 必须用【相对构建目录】的路径：链接命令的工作目录就是 build/debug，
+#     写成绝对路径时，一旦工程放在带空格的目录（如 "My Projects"）里，
+#     ninja 传给 cmd 的 -T 参数不会加引号，gcc 会把路径从空格处拆成两个
+#     参数，报 "cannot open linker script file ...: Invalid argument"。
+#     相对路径 ../../Core/... 永远是纯 ASCII、无空格，彻底躲开这个坑。
+file(RELATIVE_PATH LDSCRIPT_REL "${CMAKE_BINARY_DIR}" "${LDSCRIPT}")
 target_link_libraries(${PROJECT_NAME} PRIVATE
     bsp
-    -T${LDSCRIPT}
+    -T${LDSCRIPT_REL}
     -lc -lm -lnosys          # C 库 + 数学库 + 裸机空桩库
 )
 
@@ -65,7 +71,7 @@ target_link_options(${PROJECT_NAME} PRIVATE
     -nostartfiles             # 不用 GCC 默认启动代码，用 ST 的 startup_xxx.s
     -Wl,--gc-sections         # 垃圾回收：删掉没被引用的函数/变量，省 Flash
     -Wl,--print-memory-usage  # 链接完打印 RAM/Flash 占用百分比
-    -Wl,-Map=${CMAKE_BINARY_DIR}/${PROJECT_NAME}.map  # 生成 map 文件
+    -Wl,-Map=${PROJECT_NAME}.map  # 生成 map 文件（相对构建目录，同第 9 步）
 )
 
 # 第 11 步：编译后自动生成 .hex / .bin（烧录和量产要用）
