@@ -46,13 +46,14 @@ GD407_Demo/
 │
 ├── BSP/                          # ── 板级层 ──
 │   ├── CMakeLists.txt
-│   ├── Inc/bsp.h                 #   统一接口：clock / delay
+│   ├── Inc/bsp.h                 #   统一接口：clock / delay / led
 │   ├── Inc/bsp_bitband.h         #   Cortex-M4 位带操作
 │   └── Src/
-│       ├── bsp_clock.c           #   ★ 168MHz 时钟序列 + nvic_vector_table_set/_init/_fini 胶水
-│       └── bsp_delay.c           #   SysTick 毫秒 + DWT 微秒
+│       ├── bsp_clock.c           #   ★ 168MHz 时钟（可重配、带超时）+ 链接胶水
+│       ├── bsp_delay.c           #   SysTick 毫秒（WFI 睡眠）+ DWT 微秒
+│       └── bsp_led.c             #   板载 LED：只改顶部 4 个宏即可换板
 │
-├── App/main.c                    # 示例：PB2 推挽输出，位带翻转（500ms 周期闪烁）
+├── App/main.c                    # 示例：LED 500ms 翻转（App 不碰寄存器）
 ├── Middlewares/  tools/  Doc/    # 预留空目录
 └── build/debug/                  # 编译产物（gitignore）
 ```
@@ -88,7 +89,10 @@ GD32F407 与 STM32F407 的关键寄存器差异：
 
 另两点不同：168MHz 时 GD 要开**高驱动**（`PMU_CTL_HDEN`→等 HDRF→`HDS`→等 HDSRF），ST 只需 VOS Scale1；GD 的 FMC 没有预取/缓存使能位。
 
-> 注意：`SystemInit()`（system_gd32f4xx.c）在进 main 前**已经**配好 168MHz，`bsp_clock_init()` 是同参数的完整重配（幂等）。保留它是为了让完整寄存器流程留在 BSP 层，换晶振/降频时只改这里。
+> 注意：`SystemInit()`（system_gd32f4xx.c）在进 main 前**已经**配好 168MHz。
+> `bsp_clock_init()` 会先切到 HXTAL、关闭 PLL，再完整重配（保证 PLL 参数以 BSP 为准），
+> 所有等待都带超时；返回非 0 表示某一步超时，`SystemCoreClock` 已按实际时钟更新，
+> 程序仍可继续运行。换晶振/降频时只改 `bsp_clock.c`。
 > 另外 GD 官方 `SystemInit` 调用的 `nvic_vector_table_set()`（在官方 misc.c 里）由 bsp_clock.c 补了一个寄存器实现，避免编译官方 `.c`。
 
 ---
@@ -105,15 +109,46 @@ GD32F407 与 STM32F407 的关键寄存器差异：
 GD32F4 与 STM32F4 的 SW-DP ID 相同、Flash 控制器兼容，主线 OpenOCD 用
 `cmake/openocd/target/gd32f4.cfg`（`CPUTAPID=0` 跳过 ID 校验后 source 自带的 `gd32f4x.cfg`）即可烧录，无需专用分支。
 
+> 工程文件里不写死任何工具链绝对路径：换电脑时只要把上表四个工具加进 `PATH`，
+> 就能直接编译，`cmake/arm-none-eabi.cmake` 和 `CMakePresets.json` 都不用改。
+
+## 移动 / 复制整个工程
+
+把 `GD407_Demo/` 整个文件夹复制或移动到任何位置（路径可以含空格、中文），
+**不需要修改任何配置**，直接用下面的方式编译/烧录：
+
+- VSCode：`Ctrl+Shift+B` 编译；任务“烧录 Flash”会自动先编译再烧录。
+- 命令行：
+  ```bash
+  cmake -P tools/build.cmake                    # 编译
+  cmake -DTARGET=flash -P tools/build.cmake     # 编译并烧录
+  ```
+
+`tools/build.cmake` 每次构建前都会核对 `build/debug/CMakeCache.txt` 里记录的工程路径：
+目录变了就自动删除旧缓存、重新执行 `cmake --preset debug`，然后正常增量编译。
+因此 `build/` 可以跟着文件夹一起拷贝，不会因为旧绝对路径而报错。
+
+> 只有绕开该脚本、直接执行 `cmake --build build/debug` 时，移动目录后才需要手动删除 `build/`。
+
 ## 常用命令
 
 ```bash
-cmake --preset debug                          # 配置
-cmake --build build/debug                     # 编译（产出 elf/hex/bin + map + 体积打印）
+cmake -P tools/build.cmake                    # 编译（自动配置，产出 elf/hex/bin + map + 体积打印）
+cmake -DTARGET=flash -P tools/build.cmake     # 编译并烧录+校验+复位运行
+cmake -DPRESET=release -P tools/build.cmake   # Release（-Os + LTO + newlib-nano）
+
+# 等价的手动方式（首次配置后）
+cmake --preset debug
+cmake --build build/debug
+cmake --preset release
+cmake --build build/release
 cmake --build build/debug --target flash          # 烧录+校验+复位运行
 cmake --build build/debug --target debug_server   # GDB Server 监听 localhost:3333
 cmake --build build/debug --target reset          # 复位目标芯片
 ```
+
+延时实现：`bsp_delay_ms()` 等待时执行 `__WFI()` 让 CPU 睡眠；`bsp_delay_us()`
+按 30 亿周期分块，任意长度都不会因 32 位溢出/回绕出错。
 
 ---
 

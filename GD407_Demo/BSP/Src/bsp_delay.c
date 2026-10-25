@@ -18,8 +18,9 @@ void SysTick_Handler(void)
 void bsp_delay_init(void)
 {
     /* 第 1 步：SysTick 每 1ms 中断一次
-       SystemCoreClock/1000 = 168MHz 下每个 1ms 计 168000 个数 */
-    SysTick_Config(SystemCoreClock / 1000UL);
+       SystemCoreClock/1000 = 168MHz 下每个 1ms 计 168000 个数
+       返回值非 0 说明重装值超出 24 位，当前主频下不会发生 */
+    (void)SysTick_Config(SystemCoreClock / 1000UL);
 
     /* 第 2 步：启动 DWT 周期计数器
        注意：Cortex-M4 的 DWT【没有 LAR 锁寄存器】（LAR=0xC5ACCE55 解锁是
@@ -38,16 +39,38 @@ uint32_t bsp_tick_ms(void)
 void bsp_delay_ms(uint32_t ms)
 {
     /* 记录起点，等差值 >= 目标值。
-       用无符号减法做差值：即使 32 位计数翻转（49 天后）也不会出错 */
+       用无符号减法做差值：即使 32 位计数翻转（49 天后）也不会出错。
+       WFI 让 CPU 在等待期间睡眠，SysTick（或任意其它中断）到来时唤醒；
+       醒来后重新判断，不会因为其它中断提前退出。 */
     uint32_t start = bsp_tick_ms();
-    while ((bsp_tick_ms() - start) < ms) { }
+    while ((bsp_tick_ms() - start) < ms) {
+        __WFI();
+    }
+}
+
+/* 单块微秒延时：调用者保证 us * cycles_per_us 不超过 32 位 */
+static void delay_us_once(uint32_t us, uint32_t cycles_per_us)
+{
+    uint32_t start = DWT->CYCCNT;
+    uint32_t ticks = us * cycles_per_us;
+    while ((DWT->CYCCNT - start) < ticks) { }
 }
 
 void bsp_delay_us(uint32_t us)
 {
     /* DWT->CYCCNT 每个 CPU 周期 +1，168MHz 下 1us = 168 个计数。
-       同样用差值法，计数翻转（约 25.6 秒一次）也不受影响 */
-    uint32_t start  = DWT->CYCCNT;
-    uint32_t ticks  = us * (SystemCoreClock / 1000000UL);
-    while ((DWT->CYCCNT - start) < ticks) { }
+       直接用 us * 168 计算会在 us 约 25.5s 时乘法溢出，
+       而且 CYCCNT 本身也约 25.6 秒回绕一次。
+       这里把超长延时拆成每块最多 30 亿周期的若干段，任意 us 都正确。 */
+    uint32_t cycles_per_us = SystemCoreClock / 1000000UL;
+    if (cycles_per_us == 0u) {
+        return;                     /* 主频低于 1MHz 时无法提供微秒延时 */
+    }
+
+    uint32_t chunk_us = 3000000000UL / cycles_per_us;  /* < 2^32 周期，且 < 回绕周期 */
+    while (us > chunk_us) {
+        delay_us_once(chunk_us, cycles_per_us);
+        us -= chunk_us;
+    }
+    delay_us_once(us, cycles_per_us);
 }

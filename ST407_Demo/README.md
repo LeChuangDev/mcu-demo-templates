@@ -24,7 +24,7 @@ STM32F407_Demo/
 │   ├── arm-none-eabi.cmake       #   工具链 + 全局编译标志
 │   ├── chip.cmake                #   ★ CHIP 唯一真源：芯片参数全部自动推导
 │   ├── modules.cmake             #   stm32_add_lib / stm32_add_exe / print_size
-│   ├── openocd.cmake             #   flash / debug_server / verify / unlock
+│   ├── openocd.cmake             #   flash / debug_server / reset
 │   └── openocd/{interface,target}/   # 仿真器层 与 芯片层 解耦
 │
 ├── Config/                       # ── 编译期配置集中地 ──
@@ -45,11 +45,14 @@ STM32F407_Demo/
 │   └── External/                 # ★ 片外芯片驱动：协议/寄存器层，与板无关
 │       ├── ssd1306/  mpu6050/  w25q64/   # 每个芯片 = Inc + Src
 │
-├── BSP/                          # ★ 板级支持包：一块板 = 一个目录
-│   ├── CMakeLists.txt            #   按 BOARD 变量选择哪个板目录
-│   ├── Inc/bsp.h                 #   ★ 所有板卡必须实现的统一接口契约
-│   ├── MyBoard_407/              #   板 A：自己画的板
-│   └── NUCLEO_F407ZG/            #   板 B：官方板（换板 = 切 BOARD 变量）
+├── BSP/                          # ★ 板级支持包（模板当前实现）
+│   ├── CMakeLists.txt            #   自动收集 Src/*.c，对外暴露 Inc/
+│   ├── Inc/bsp.h                 #   ★ App 唯一可见的接口
+│   ├── Inc/bsp_bitband.h         #   位带操作（BSP 内部使用）
+│   └── Src/
+│       ├── bsp_clock.c           #   168MHz 时钟：可重配、带超时、失败回退 HSI
+│       ├── bsp_delay.c           #   SysTick 毫秒（WFI 睡眠）+ DWT 微秒
+│       └── bsp_led.c             #   板载 LED：只改顶部 4 个宏即可换板
 │
 ├── Middlewares/                  # ★ 第三方中间件：原样放入，只写"包装"，不改源码
 │   ├── FreeRTOS/  LVGL/  FatFs/  mbedtls/  micro_ros/
@@ -99,8 +102,9 @@ App  ──►  BSP  ──►  Drivers/External(片外芯片)
 - VSCode：`Ctrl+Shift+B` 编译；任务“烧录 Flash”会自动先编译再烧录。
 - 命令行：
   ```bash
-  cmake -P tools/build.cmake                    # 编译
+  cmake -P tools/build.cmake                    # 编译（debug）
   cmake -DTARGET=flash -P tools/build.cmake     # 编译并烧录
+  cmake -DPRESET=release -P tools/build.cmake   # Release 构建
   ```
 
 `tools/build.cmake` 每次构建前都会核对 `build/debug/CMakeCache.txt` 里记录的工程路径：
@@ -109,19 +113,37 @@ App  ──►  BSP  ──►  Drivers/External(片外芯片)
 
 > 只有绕开该脚本、直接执行 `cmake --build build/debug` 时，移动目录后才需要手动删除 `build/`。
 
+## 时钟 / 延时 / LED 实现要点
+
+- **时钟**：`bsp_clock_init()` 返回 `int`。它会先切回 HSI、关闭 PLL，再完整重配，
+  因此 PLL 参数以 BSP 为准，重复调用也安全；HSE/PLL/调压器等待都带超时，
+  失败时回退 HSI 并更新 `SystemCoreClock`（返回非 0，程序仍可运行）。
+- **毫秒延时**：`bsp_delay_ms()` 在等待期间执行 `__WFI()`，CPU 睡眠而不是空转。
+- **微秒延时**：`bsp_delay_us()` 内部按 30 亿周期分块，超过 25.5s 也不会溢出/回绕出错。
+- **LED**：App 只调用 `bsp_led_init/on/off/toggle()`；换板子改
+  [BSP/Src/bsp_led.c](BSP/Src/bsp_led.c) 顶部的 `LED_GPIO / LED_PIN / LED_RCC_EN / LED_ACTIVE_LEVEL`。
+
 ## 常用命令（CMake 文件就绪后）
 
 ```bash
-# 配置（首次，或改动 CMakeLists / 新增源文件后）
+# Debug（默认）
 cmake --preset debug
-
-# 编译
 cmake --build build/debug
 
-# 烧录 / 复位 / 起 GDB Server
+# Release（-Os + LTO + newlib-nano，体积更小）
+cmake --preset release
+cmake --build build/release
+
+# 烧录 / 复位 / 起 GDB Server（Debug）
 cmake --build build/debug --target flash
 cmake --build build/debug --target reset
 cmake --build build/debug --target debug_server
+```
+
+也可以直接用统一入口，预设名由 `-DPRESET` 指定（缺省 `debug`）：
+
+```bash
+cmake -DPRESET=release -P tools/build.cmake
 ```
 
 切换芯片或板子只改 `CMakePresets.json` 里的 `-DCHIP=... -DBOARD=...`，不动任何 CMakeLists。

@@ -20,6 +20,10 @@ set(CMAKE_C_COMPILER    arm-none-eabi-gcc)
 set(CMAKE_ASM_COMPILER  arm-none-eabi-gcc)   # 汇编也用 gcc 驱动(.s 支持预处理)
 set(CMAKE_OBJCOPY       arm-none-eabi-objcopy)
 set(CMAKE_SIZE          arm-none-eabi-size)
+# Release 用了 -flto：静态库必须用 gcc-ar/gcc-ranlib 生成符号索引，
+# 否则普通 ar 不加载 LTO 插件，链接器会报 "undefined reference to bsp_xxx"
+set(CMAKE_AR            arm-none-eabi-gcc-ar)
+set(CMAKE_RANLIB        arm-none-eabi-gcc-ranlib)
 
 # 第 4 步：内核与 FPU 标志 ★ 换内核才改这里（同系列换型号不用动）★
 #   F407 = Cortex-M4 + 单精度 FPU
@@ -50,10 +54,12 @@ set(CMAKE_EXE_LINKER_FLAGS_INIT "${CPU_FLAGS}")
 #   clangd 能识别 sccache 这个名字并自动跳过，不影响静态分析。
 #   其他平台或不需要时：cmake -DENABLE_GCC_UTF8_WRAPPER=OFF
 set(ENABLE_GCC_UTF8_WRAPPER ON CACHE BOOL "用包装器把 gcc 的 GBK 诊断流转成 UTF-8")
-if(WIN32 AND ENABLE_GCC_UTF8_WRAPPER)
+if(CMAKE_HOST_WIN32 AND ENABLE_GCC_UTF8_WRAPPER)
     set(_UTF8_LAUNCHER "${CMAKE_CURRENT_LIST_DIR}/sccache.bat")
     if(EXISTS "${_UTF8_LAUNCHER}")
-        set(CMAKE_C_COMPILER_LAUNCHER   "${_UTF8_LAUNCHER}")
-        set(CMAKE_ASM_COMPILER_LAUNCHER "${_UTF8_LAUNCHER}")
+        # 注意：CMake 的 CMAKE_<LANG>_COMPILER_LAUNCHER 不支持 ASM 语言，
+        # 这里只设 C；汇编（含大写 .S）的转码由顶层 CMakeLists 的
+        # CMAKE_ASM_COMPILE_OBJECT 规则补上。
+        set(CMAKE_C_COMPILER_LAUNCHER "${_UTF8_LAUNCHER}")
     endif()
 endif()

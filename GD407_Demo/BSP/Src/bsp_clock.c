@@ -16,10 +16,11 @@
  *     2) GD 的 FMC 没有 ST 那种 PRFTEN/ICEN/DCEN 位——ART 加速器始终生效，
  *        只能设置等待周期 WSCNT。
  *
- * 注意：启动文件调用的 SystemInit()（system_gd32f4xx.c）在进入 main 前
- *       【已经】按 25MHz 把系统配到了 168MHz，所以本函数通常是一次
- *       "同参数重配"（幂等，无害）；保留它是为了把完整寄存器流程留在 BSP 层，
- *       换晶振/降频或不依赖 SystemInit 时直接改这里即可。
+ * ★ 与 SystemInit() 的关系 ★
+ *   startup 里的 SystemInit()（system_gd32f4xx.c）进场前已经把时钟配到 168MHz。
+ *   本函数仍然完整重配一遍，但顺序是安全的：先切到 HXTAL，再关 PLL，最后改参数。
+ *   所有等待都带超时，HXTAL/PLL/PMU 异常时不会永久卡死；
+ *   返回值非 0 时调用者可继续运行（SystemCoreClock 已按实际时钟更新）。
  */
 #include "bsp.h"
 #include "gd32f4xx.h"
@@ -31,7 +32,23 @@
 #define RCU_PLL_PLLP_SHIFT    16u    /* P 字段位域:        bit[17:16]，00 = ÷2 */
 #define RCU_PLL_PLLQ_SHIFT    24u    /* Q 字段位域:        bit[27:24] */
 
-void bsp_clock_init(void)
+/* 等待超时：即使还在 16MHz IRC16M 上，也足够覆盖晶振起振（典型 1~2ms） */
+#define CLOCK_WAIT_TIMEOUT  500000u
+
+/* 等 reg 的 mask 位变成 value；超时返回 -1。
+   GD 的寄存器宏展开就是 volatile 解引用，&RCU_CTL 可直接取到 volatile 指针。 */
+static int clock_wait(volatile uint32_t *reg, uint32_t mask, uint32_t value)
+{
+    uint32_t timeout = CLOCK_WAIT_TIMEOUT;
+    while ((*reg & mask) != value) {
+        if (--timeout == 0u) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
+int bsp_clock_init(void)
 {
     /* 第 1 步：开 PMU 时钟，LDO 输出切到高档，等就绪
        GD32F407 跑高主频前 PMU_CTL_LDOVS 要写 11b（LDO 高输出档），
@@ -39,7 +56,10 @@ void bsp_clock_init(void)
     RCU_APB1EN |= RCU_APB1EN_PMUEN;
     (void)RCU_APB1EN;                       /* 读一次，等 APB 总线同步 */
     PMU_CTL |= PMU_CTL_LDOVS;
-    while (!(PMU_CS & PMU_CS_LDOVSRF)) { }  /* 等 LDO 电压档切换就绪 */
+    if (clock_wait(&PMU_CS, PMU_CS_LDOVSRF, PMU_CS_LDOVSRF) != 0) {
+        SystemCoreClockUpdate();
+        return -1;
+    }
 
     /* 第 2 步：Flash 等待周期
        168MHz/3.3V 时按手册需要 5 个等待周期（WS_WSCNT_5）。
@@ -47,21 +67,30 @@ void bsp_clock_init(void)
        GD 没有预取/缓存使能位：ART 指令加速器上电即工作。 */
     FMC_WS = (FMC_WS & ~FMC_WC_WSCNT) | WS_WSCNT_5;
 
-    /* 第 3 步：开 HXTAL 外部晶振，等稳定 */
+    /* 第 3 步：开 HXTAL 外部晶振，等稳定（带超时） */
     RCU_CTL |= RCU_CTL_HXTALEN;
-    while (!(RCU_CTL & RCU_CTL_HXTALSTB)) { }
+    if (clock_wait(&RCU_CTL, RCU_CTL_HXTALSTB, RCU_CTL_HXTALSTB) != 0) {
+        SystemCoreClockUpdate();            /* 保持原时钟，让延时按实际频率计算 */
+        return -2;
+    }
 
     /* 第 4 步：若系统时钟正来自 PLL，先切到 HXTAL
        PLL 使能时 RCU_PLL 的配置位不可写，重配 PLL 前必须先关掉它，
        而关 PLL 前系统时钟又不能还选着 PLL，故先临时切到 HXTAL */
     if ((RCU_CFG0 & RCU_CFG0_SCSS) == RCU_SCSS_PLLP) {
         RCU_CFG0 = (RCU_CFG0 & ~RCU_CFG0_SCS) | RCU_CKSYSSRC_HXTAL;
-        while ((RCU_CFG0 & RCU_CFG0_SCSS) != RCU_SCSS_HXTAL) { }
+        if (clock_wait(&RCU_CFG0, RCU_CFG0_SCSS, RCU_SCSS_HXTAL) != 0) {
+            SystemCoreClockUpdate();
+            return -3;
+        }
     }
 
-    /* 第 5 步：关 PLL，等 PLLSTB 回落到 0（PLL 完全停止后参数才可改写） */
+    /* 第 5 步：关 PLL，等 PLLSTB 回落到 0（带超时；PLL 完全停止后参数才可改写） */
     RCU_CTL &= ~RCU_CTL_PLLEN;
-    while (RCU_CTL & RCU_CTL_PLLSTB) { }
+    if (clock_wait(&RCU_CTL, RCU_CTL_PLLSTB, 0u) != 0) {
+        SystemCoreClockUpdate();
+        return -4;
+    }
 
     /* 第 6 步：总线分频
        AHB  = SYSCLK / 1 -> HCLK  168MHz
@@ -89,21 +118,34 @@ void bsp_clock_init(void)
        GD32F407 主频超过 ~120MHz 时必须进高驱动模式，顺序固定：
        HDEN=1 -> 等 HDRF -> HDS=1 -> 等 HDSRF */
     RCU_CTL |= RCU_CTL_PLLEN;
-    while (!(RCU_CTL & RCU_CTL_PLLSTB)) { }
+    if (clock_wait(&RCU_CTL, RCU_CTL_PLLSTB, RCU_CTL_PLLSTB) != 0) {
+        SystemCoreClockUpdate();
+        return -5;
+    }
     PMU_CTL |= PMU_CTL_HDEN;
-    while (!(PMU_CS & PMU_CS_HDRF)) { }
+    if (clock_wait(&PMU_CS, PMU_CS_HDRF, PMU_CS_HDRF) != 0) {
+        SystemCoreClockUpdate();
+        return -6;
+    }
     PMU_CTL |= PMU_CTL_HDS;
-    while (!(PMU_CS & PMU_CS_HDSRF)) { }
+    if (clock_wait(&PMU_CS, PMU_CS_HDSRF, PMU_CS_HDSRF) != 0) {
+        SystemCoreClockUpdate();
+        return -7;
+    }
 
-    /* 第 9 步：把系统时钟源切到 PLLP，等 SCSS 状态确认
+    /* 第 9 步：把系统时钟源切到 PLLP，等 SCSS 状态确认（带超时）
        SCS[1:0] 是"选择"位，SCSS[3:2] 是"当前实际使用源"的状态位 */
     RCU_CFG0 = (RCU_CFG0 & ~RCU_CFG0_SCS) | RCU_CKSYSSRC_PLLP;
-    while ((RCU_CFG0 & RCU_CFG0_SCSS) != RCU_SCSS_PLLP) { }
+    if (clock_wait(&RCU_CFG0, RCU_CFG0_SCSS, RCU_SCSS_PLLP) != 0) {
+        SystemCoreClockUpdate();
+        return -8;
+    }
 
     /* 第 10 步：更新 SystemCoreClock 全局变量
        system_gd32f4xx.c 维护，bsp_delay 用它换算周期数；
        不调的话 DWT 微秒延时会按旧频率算，时间全错 */
     SystemCoreClockUpdate();
+    return 0;
 }
 
 /* ========================================================================== */

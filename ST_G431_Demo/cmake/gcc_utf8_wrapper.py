@@ -16,6 +16,13 @@ gcc_utf8_wrapper.py —— arm-none-eabi-gcc 输出编码转码包装器
   对任意字节都能解码，不会抛异常）增量解码后以 UTF-8 原样转发，
   不改动任何编译参数、不改变退出码，只做编码转换。
 
+【顺带修正 .d 依赖文件的编码】
+  gcc 生成的依赖文件（-MF 指定的 CMakeFiles/xxx.obj.d）同样按 ANSI(GBK)
+  写路径。Ninja 按 UTF-8 读取，缓存里会变成乱码路径，于是每次都认为
+  源文件“脏”，工程放在中文目录时每次编译都会全量重建。
+  编译成功后本脚本把该文件从 GB18030 转成 UTF-8（纯 ASCII 时内容不变，
+  仍是合法的 UTF-8，直接原样保留），编译失败则不动。
+
 【为什么外层 .bat 叫 sccache.bat】
   clangd 从 compile_commands.json 看到编译命令最前面是本包装器时，
   必须把它识别为“编译启动器”并跳过，否则会把 python/.bat 当成编译器。
@@ -57,6 +64,38 @@ def _pump(raw_stream, out_binary, encoding):
         pass
 
 
+def _fix_depfile_encoding(args):
+    """把 gcc 用 GBK 写出的 -MF 依赖文件转成 UTF-8（失败不报错）。
+
+    Ninja 解析依赖文件时按 UTF-8 处理；中文路径若保持 GBK 字节，
+    依赖记录就会变成乱码，导致源文件每次都被判定为已修改。
+    """
+    depfile = None
+    for i, arg in enumerate(args):
+        if arg == '-MF' and i + 1 < len(args):
+            depfile = args[i + 1]
+        elif arg.startswith('-MF') and len(arg) > 3:
+            depfile = arg[3:]
+
+    if not depfile:
+        return
+
+    try:
+        with open(depfile, 'rb') as f:
+            data = f.read()
+        try:
+            data.decode('utf-8')       # 纯 ASCII 或本来就是 UTF-8
+            return
+        except UnicodeDecodeError:
+            pass
+        text = data.decode('gb18030', errors='replace')
+        with open(depfile, 'wb') as f:
+            f.write(text.encode('utf-8'))
+    except OSError:
+        # 依赖文件不存在或无权限：保持 gcc 的原始结果，不影响编译
+        pass
+
+
 def main():
     if len(sys.argv) < 2:
         sys.stderr.write('gcc_utf8_wrapper: missing compiler path\n')
@@ -87,11 +126,15 @@ def main():
     t_err.start()
 
     try:
-        return proc.wait()
+        returncode = proc.wait()
     except KeyboardInterrupt:
         proc.terminate()
         proc.wait()
         return 130
+
+    if returncode == 0:
+        _fix_depfile_encoding(args)
+    return returncode
 
 
 if __name__ == '__main__':

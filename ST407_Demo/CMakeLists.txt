@@ -19,6 +19,23 @@ project(STM32F407_Register
     VERSION 1.0.0
     LANGUAGES C ASM)
 
+# 第 4.1 步：汇编文件也套上 GBK→UTF-8 包装器
+#   CMake 的 CMAKE_<LANG>_COMPILER_LAUNCHER 只对 C/CXX 等语言生效，
+#   ASM 语言会被忽略；而带预处理的大写 .S 启动文件同样会生成 .d 依赖文件，
+#   中文目录下 GBK 路径会让 Ninja 每次都判定它“脏”并重建。
+#   这里把包装器直接写进 ASM 编译规则，效果与 C 源文件一致。
+if(CMAKE_HOST_WIN32 AND EXISTS "${CMAKE_SOURCE_DIR}/cmake/sccache.bat")
+    set(CMAKE_ASM_COMPILE_OBJECT
+        "\"${CMAKE_SOURCE_DIR}/cmake/sccache.bat\" <CMAKE_ASM_COMPILER> <DEFINES> <INCLUDES> <FLAGS> -o <OBJECT> -c <SOURCE>")
+endif()
+
+# 第 4.2 步：固定 C 语言标准
+#   不同 GCC 版本的默认标准会变（GCC 15 已默认 gnu23），显式钉在 gnu11，
+#   避免换工具链后语法/隐式声明规则悄悄改变。
+set(CMAKE_C_STANDARD          11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS        ON)
+
 # 第 5 步：没指定构建类型时默认 Debug
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
@@ -39,6 +56,7 @@ add_compile_options(
     $<$<CONFIG:Debug>:-Og>               # -Og: 专门为调试优化的等级
     $<$<CONFIG:Debug>:-g3>               # -g3: 连宏定义都能在调试器里展开
     $<$<CONFIG:Release>:-Os>             # 发布版以体积最小为目标
+    $<$<CONFIG:Release>:-flto>           # Release 链接时优化：跨文件内联+死代码消除
 )
 
 # 第 7 步：引入 BSP 子目录（产出 bsp、cmsis 两个目标）
@@ -72,6 +90,8 @@ target_link_options(${PROJECT_NAME} PRIVATE
     -Wl,--gc-sections         # 垃圾回收：删掉没被引用的函数/变量，省 Flash
     -Wl,--print-memory-usage  # 链接完打印 RAM/Flash 占用百分比
     -Wl,-Map=${PROJECT_NAME}.map  # 生成 map 文件（相对构建目录，同第 9 步）
+    -specs=nano.specs         # newlib-nano：以后用 printf/sprintf 可省大量 Flash
+    $<$<CONFIG:Release>:-flto>    # 与编译阶段的 -flto 配套
 )
 
 # 第 11 步：编译后自动生成 .hex / .bin（烧录和量产要用）
