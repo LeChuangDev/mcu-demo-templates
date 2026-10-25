@@ -26,7 +26,7 @@ set(CMAKE_AR            arm-none-eabi-gcc-ar)
 set(CMAKE_RANLIB        arm-none-eabi-gcc-ranlib)
 
 # 第 4 步：内核与 FPU 标志 ★ 换内核才改这里（同系列换型号不用动）★
-#   F407 = Cortex-M4 + 单精度 FPU
+#   G431 = Cortex-M4F + 单精度 FPU
 #   无 FPU 的系列(F1/F0/G0)要把下面两行 -mfpu/-mfloat-abi 整行删掉
 #   F7/H7 双精度要改成 -mfpu=fpv5-d16
 #

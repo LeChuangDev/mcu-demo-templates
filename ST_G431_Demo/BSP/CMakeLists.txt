@@ -6,7 +6,7 @@
 add_library(cmsis INTERFACE)
 target_include_directories(cmsis SYSTEM INTERFACE
     ${CMSIS_CORE_INC}          # core_cm4.h 等内核头
-    ${CMSIS_DEV_INC})          # stm32f4xx.h 寄存器定义
+    ${CMSIS_DEV_INC})          # stm32g4xx.h 寄存器定义
 target_compile_definitions(cmsis INTERFACE ${DEVICE_DEF})
 
 # 第 2 步：BSP 静态库（自动收集 Src/*.c，自动暴露 Inc/）
@@ -17,8 +17,8 @@ stm32_add_lib(bsp)
 target_link_libraries(bsp PUBLIC cmsis)
 
 # 第 4 步：板载晶振频率 ★ 按你板子上实际焊的晶振改 ★
-#   8MHz 是最小系统板最常见的值；25MHz 是部分官方板的
+#   当前模板按 8MHz 配置（WeAct/Core 板最常见）；24MHz 用于 NUCLEO-G431RB/KB。
 #   PUBLIC 会把这个编译定义传播给所有依赖方——
-#   包括下面直接编进可执行文件的 system_stm32f4xx.c
+#   包括下面直接编进可执行文件的 system_stm32g4xx.c
 #   (SystemCoreClock 的换算需要它，填错会导致 delay_us 时间不准)
 target_compile_definitions(bsp PUBLIC HSE_VALUE=8000000U)

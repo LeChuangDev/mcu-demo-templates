@@ -8,7 +8,7 @@
       "toolchainFile": "${sourceDir}/cmake/arm-none-eabi.cmake",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CHIP": "STM32F407VG",
+        "CHIP": "STM32G431CB",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
     },

@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 /* ---- 时钟 ---- */
-int bsp_clock_init(void);           /* 0 = 168MHz 就绪；非 0 = 已回退 HSI（仍可运行） */
+int bsp_clock_init(void);           /* 0 = 170MHz 就绪；非 0 = 已回退 HSI（仍可运行） */
 
 /* ---- 延时（HAL 时代 HAL_Delay 的替代品）---- */
 void     bsp_delay_init(void);      /* 初始化 SysTick(1ms) 和 DWT(微秒) */

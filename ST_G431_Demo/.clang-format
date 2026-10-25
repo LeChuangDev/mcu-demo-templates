@@ -1,7 +1,7 @@
 # =====================================================================
 # .clang-format  —  本工程统一的 C/C++ 代码风格
 # 适用范围：App / BSP / Drivers(External) 等自己编写的代码
-# 注意：Drivers/STM32F4xx_HAL_Driver、Middlewares/ 下的第三方源码
+# 注意：Drivers/STM32G4xx_HAL_Driver、Middlewares/ 下的第三方源码
 #       【原样保留、不要格式化】，避免与官方升级产生海量 diff。
 # 用法：clang-format -i App/**/*.c BSP/**/*.c
 # =====================================================================

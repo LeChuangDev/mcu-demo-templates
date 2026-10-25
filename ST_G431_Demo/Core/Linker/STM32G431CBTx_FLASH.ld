@@ -1,9 +1,11 @@
 /* =====================================================================
- *  STM32F407VGTx_FLASH.ld —— GNU ld 链接脚本
+ *  STM32G431CBTx_FLASH.ld —— GNU ld 链接脚本
  *  【换规格只改 MEMORY 里的 LENGTH】
- *    STM32F407VG : Flash 1024K  (本文件)
- *    STM32F407VE : Flash  512K  (只把 FLASH 的 LENGTH 改成 512K)
- *    RAM: 128K(0x20000000) + 64K CCM(0x10000000)
+ *    STM32G431CB : Flash 128K  (本文件)
+ *    STM32G431C8 : Flash  64K  (只把 FLASH 的 LENGTH 改成 64K)
+ *    STM32G431C6 : Flash  32K
+ *    RAM: 32K(0x20000000) + 10K CCM(0x10000000)
+ *  参考: RM0440 存储器映射 / DS12589 数据手册
  * ===================================================================== */
 
 ENTRY(Reset_Handler)                 /* 入口 = 启动文件里的 Reset_Handler */
@@ -19,10 +21,11 @@ _Min_Stack_Size = 0x400;
 MEMORY
 {
   /* CCM RAM：挂在 CPU 私有总线，DMA 访问不到！
-     要用的话自己加 SECTION，本模板不主动放数据进去 */
-  CCMRAM (xrw) : ORIGIN = 0x10000000, LENGTH = 64K
-  RAM (xrw) : ORIGIN = 0x20000000, LENGTH = 128K
-  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 1024K
+     要用的话自己加 SECTION，本模板不主动放数据进去。
+     G431 的 CCM 只有 10K，不要按 F4 的 64K 写。 */
+  CCMRAM (xrw) : ORIGIN = 0x10000000, LENGTH = 10K
+  RAM (xrw) : ORIGIN = 0x20000000, LENGTH = 32K
+  FLASH (rx) : ORIGIN = 0x08000000, LENGTH = 128K
 }
 
 /* ---- 段布局 ---- */

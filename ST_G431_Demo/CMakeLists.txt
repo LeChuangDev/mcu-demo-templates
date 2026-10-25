@@ -1,5 +1,5 @@
 # =====================================================================
-#  STM32F407 寄存器版工程总装脚本
+#  STM32G431 寄存器版工程总装脚本
 #  职责：把 BSP / Core / CMSIS 装进一个可执行文件，并产出 hex/bin
 # =====================================================================
 
@@ -15,7 +15,7 @@ include(chip)
 
 # 第 4 步：工程定义
 #   LANGUAGES C ASM 不能少——ASM 让 .s 启动文件被正确编译
-project(STM32F407_Register
+project(STM32G431_Register
     VERSION 1.0.0
     LANGUAGES C ASM)
 
@@ -64,10 +64,13 @@ add_subdirectory(BSP)
 
 # 第 8 步：可执行文件 = main.c + 启动文件 + system 文件
 #   注意：启动文件和 system 文件是"芯片层"的，直接编进最终固件
+#   init_stubs.c 补 _init/_fini：官方 G4 启动文件会调 __libc_init_array，
+#   而 -nostartfiles 不会链入 crti.o，缺少 _init 会链接失败
 add_executable(${PROJECT_NAME}
     App/main.c
     ${STARTUP_FILE}                                          # 向量表
-    ${CMAKE_SOURCE_DIR}/Core/System/system_${STM32_FAMILY_LC}xx.c)  # SystemInit
+    ${CMAKE_SOURCE_DIR}/Core/System/system_${STM32_FAMILY_LC}xx.c   # SystemInit
+    ${CMAKE_SOURCE_DIR}/Core/System/init_stubs.c)            # _init/_fini
 
 # 第 9 步：链接关系
 #   链接 bsp 会自动带入 cmsis 的头文件路径/器件宏/HSE_VALUE

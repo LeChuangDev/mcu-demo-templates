@@ -4,11 +4,11 @@
  *  微秒: DWT 硬件计数器，计数频率 = CPU 主频，不占任何外设
  */
 #include "bsp.h"
-#include "stm32f4xx.h"
+#include "stm32g4xx.h"
 
 static volatile uint32_t g_ms_tick = 0;    /* 毫秒计数值，中断里累加 */
 
-/* 启动文件 startup_stm32f407xx.s 里 SysTick_Handler 是弱符号，
+/* 启动文件 startup_stm32g431xx.s 里 SysTick_Handler 是弱符号，
    我们在这里定义强符号，链接时自动覆盖它 */
 void SysTick_Handler(void)
 {
@@ -18,7 +18,7 @@ void SysTick_Handler(void)
 void bsp_delay_init(void)
 {
     /* 第 1 步：SysTick 每 1ms 中断一次
-       SystemCoreClock/1000 = 168MHz 下每个 1ms 计 168000 个数
+       SystemCoreClock/1000 = 170MHz 下每个 1ms 计 170000 个数
        返回值非 0 说明重装值超出 24 位，当前主频下不会发生 */
     (void)SysTick_Config(SystemCoreClock / 1000UL);
 
@@ -58,8 +58,8 @@ static void delay_us_once(uint32_t us, uint32_t cycles_per_us)
 
 void bsp_delay_us(uint32_t us)
 {
-    /* DWT->CYCCNT 每个 CPU 周期 +1，168MHz 下 1us = 168 个计数。
-       直接用 us * 168 计算会在 us 约 25.5s 时乘法溢出，
+    /* DWT->CYCCNT 每个 CPU 周期 +1，170MHz 下 1us = 170 个计数。
+       直接用 us * 170 计算会在 us 约 25.2s 时乘法溢出，
        而且 CYCCNT 本身也约 25.6 秒回绕一次。
        这里把超长延时拆成每块最多 30 亿周期的若干段，任意 us 都正确。 */
     uint32_t cycles_per_us = SystemCoreClock / 1000000UL;

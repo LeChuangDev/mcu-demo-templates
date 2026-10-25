@@ -3,7 +3,7 @@
 #
 #  背景：真正的编译由 arm-none-eabi-gcc + Ninja 完成，clangd 只做静态
 #  分析（编辑器里的红线/补全/跳转）。它默认按主机 PC 环境分析，既不知道
-#  CMSIS 头在哪，也不知道器件宏 STM32F40_41xxx，于是满屏标红。
+#  CMSIS 头在哪，也不知道器件宏 STM32G431xx，于是满屏标红。
 #
 #  数据源优先级：compile_commands.json（CMake 导出的【真实编译命令】）
 #    已在 CMakePresets.json 里设 CMAKE_EXPORT_COMPILE_COMMANDS=ON，

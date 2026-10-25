@@ -1,7 +1,8 @@
-# STM32F407_Demo
+# STM32G431_Demo
 
 基于 **arm-none-eabi-gcc + CMake + Ninja + OpenOCD** 的 STM32 工程模板。
-当前默认目标：**STM32F407VGT6**（1MB Flash / 128KB SRAM + 64KB CCM），调试器 **CMSIS-DAP（DAP-Link）**。
+当前默认目标：**STM32G431CBT6**（128KB Flash / 32KB SRAM + 10KB CCM），
+系统时钟 **170MHz**（8MHz HSE → PLL），调试器 **CMSIS-DAP（DAP-Link）**。
 
 设计目标：
 
@@ -14,7 +15,7 @@
 ## 目录结构
 
 ```
-STM32F407_Demo/
+ST_G431_Demo/
 │
 ├── CMakeLists.txt                # 总装：只做全局选项 + add_subdirectory
 ├── CMakePresets.json             # 一键配置（CHIP/BOARD/模块开关全在这里）
@@ -28,29 +29,33 @@ STM32F407_Demo/
 │   └── openocd/{interface,target}/   # 仿真器层 与 芯片层 解耦
 │
 ├── Config/                       # ── 编译期配置集中地 ──
-│   ├── stm32f4xx_hal_conf.h      #   HAL 裁剪（HSE_VALUE、模块开关）
+│   ├── stm32g4xx_hal_conf.h      #   HAL 裁剪（HSE_VALUE、模块开关）
 │   ├── FreeRTOSConfig.h          #   启用 FreeRTOS 时才有
 │   ├── lv_conf.h                 #   启用 LVGL 时才有
 │   ├── mbedtls_config.h          #   用加密时
 │   └── boards/                   #   可选：纯宏配置的板级差异也放这里
 │
 ├── Core/                         # ── 芯片层：换芯片才动 ──
-│   ├── Startup/startup_stm32f407xx.s
-│   ├── System/system_stm32f4xx.c
-│   └── Linker/STM32F407VGTx_FLASH.ld
+│   ├── Startup/startup_stm32g431xx.s
+│   ├── System/
+│   │   ├── system_stm32g4xx.c    #   SystemInit / SystemCoreClock
+│   │   └── init_stubs.c          #   _init/_fini（-nostartfiles 配套）
+│   └── Linker/STM32G431CBTx_FLASH.ld
 │
 ├── Drivers/                      # ── 芯片层：换芯片才动 ──
-│   ├── CMSIS/                    #   CMSIS Core + Device（官方原样）
-│   ├── STM32F4xx_HAL_Driver/     #   ST 官方库，原样复制，永不修改
+│   ├── CMSIS/                    #   CMSIS Core 5.x + Device（官方原样）
+│   │   ├── Core/Include/         #   core_cm4.h、cmsis_gcc.h …
+│   │   └── Device/ST/STM32G4xx/  #   stm32g4xx.h / stm32g431xx.h / system…
+│   ├── STM32G4xx_HAL_Driver/     #   ST 官方库，原样复制，永不修改（可选）
 │   └── External/                 # ★ 片外芯片驱动：协议/寄存器层，与板无关
 │       ├── ssd1306/  mpu6050/  w25q64/   # 每个芯片 = Inc + Src
 │
 ├── BSP/                          # ★ 板级支持包（模板当前实现）
 │   ├── CMakeLists.txt            #   自动收集 Src/*.c，对外暴露 Inc/
 │   ├── Inc/bsp.h                 #   ★ App 唯一可见的接口
-│   ├── Inc/bsp_bitband.h         #   位带操作（BSP 内部使用）
+│   ├── Inc/bsp_bitband.h         #   位带工具（G4 的 GPIO 不能用，见文件头）
 │   └── Src/
-│       ├── bsp_clock.c           #   168MHz 时钟：可重配、带超时、失败回退 HSI
+│       ├── bsp_clock.c           #   170MHz：Boost + PLL，可重配、带超时、失败回退 HSI
 │       ├── bsp_delay.c           #   SysTick 毫秒（WFI 睡眠）+ DWT 微秒
 │       └── bsp_led.c             #   板载 LED：只改顶部 4 个宏即可换板
 │
@@ -115,13 +120,21 @@ App  ──►  BSP  ──►  Drivers/External(片外芯片)
 
 ## 时钟 / 延时 / LED 实现要点
 
-- **时钟**：`bsp_clock_init()` 返回 `int`。它会先切回 HSI、关闭 PLL，再完整重配，
-  因此 PLL 参数以 BSP 为准，重复调用也安全；HSE/PLL/调压器等待都带超时，
-  失败时回退 HSI 并更新 `SystemCoreClock`（返回非 0，程序仍可运行）。
+- **时钟**：`bsp_clock_init()` 返回 `int`。G4 与 F4 的时钟树不同：
+  PLL 为 `M 分频 → N 倍频 → R 分频`，且 170MHz 必须开 Boost 模式
+  （`PWR_CR5.R1MODE=0` + `PWR_CR1.VOS=Range1`）。
+  本模板按 8MHz HSE：`8 ÷ 2 × 85 ÷ 2 = 170MHz`，Flash 4WS。
+  函数会先切回 HSI、关闭 PLL 再完整重配，失败时回退 HSI 并更新
+  `SystemCoreClock`（返回非 0，程序仍可运行）。
 - **毫秒延时**：`bsp_delay_ms()` 在等待期间执行 `__WFI()`，CPU 睡眠而不是空转。
-- **微秒延时**：`bsp_delay_us()` 内部按 30 亿周期分块，超过 25.5s 也不会溢出/回绕出错。
+- **微秒延时**：`bsp_delay_us()` 内部按 30 亿周期分块，超过 25s 也不会溢出/回绕出错。
 - **LED**：App 只调用 `bsp_led_init/on/off/toggle()`；换板子改
   [BSP/Src/bsp_led.c](BSP/Src/bsp_led.c) 顶部的 `LED_GPIO / LED_PIN / LED_RCC_EN / LED_ACTIVE_LEVEL`。
+  G4 的 GPIO 在 `0x4800_0000`，不在 Cortex-M4 外设位带区，所以 LED 用
+  `GPIOx->BSRR` 而不是位带。
+  默认 LED 是 **PB2**；若使用 WeAct STM32G431 Core Board，板载 LED 实际在
+  **PC6**（PB2 是 USB VBUS 检测），把 `bsp_led.c` 顶部改成
+  `GPIOC / 6 / RCC_AHB2ENR_GPIOCEN` 即可。
 
 ## 常用命令（CMake 文件就绪后）
 

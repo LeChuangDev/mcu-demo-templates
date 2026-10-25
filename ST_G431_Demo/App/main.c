@@ -9,10 +9,10 @@
 
 int main(void)
 {
-    /* 第 1 步：时钟 168MHz
-       SystemInit 已先配过一遍；bsp_clock_init 会切回 HSI、关 PLL 后完整重配，
-       保证 PLL 参数以 BSP 为准。返回非 0 表示 HSE/PLL 超时、已回退 HSI，
-       程序仍可继续运行（延时按实际主频换算）。 */
+    /* 第 1 步：时钟 170MHz
+       CubeG4 的 SystemInit 不配 PLL（只做 FPU/向量表）；bsp_clock_init 从
+       HSI 开始完整重配 PLL，保证时钟参数以 BSP 为准。返回非 0 表示
+       HSE/PLL 超时、已回退 HSI，程序仍可继续运行（延时按实际主频换算）。 */
     (void)bsp_clock_init();
 
     /* 第 2 步：SysTick + DWT 延时初始化 */
