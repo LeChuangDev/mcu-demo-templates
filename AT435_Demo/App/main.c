@@ -1,3 +1,11 @@
+/*
+ * @Author: 樂創 dev@zhangwenle.com
+ * @Date: 2026-10-06 22:42:36
+ * @LastEditors: 樂創 dev@zhangwenle.com
+ * @LastEditTime: 2026-10-25 19:58:24
+ * @FilePath: \AT435_Demo\App\main.c
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 /**
  * @file  main.c —— 寄存器版最小主程序（AT32F435CGT7）
  * 流程: 时钟初始化(HEXT 8M->PLL 288M) -> 延时初始化 -> 配 PA9/PA10 -> 拉低点亮 LED
@@ -48,7 +56,6 @@ int main(void)
        也可用 GPIOA->clr（0x28）原子清位寄存器：GPIOA->clr = (1u<<9)|(1u<<10); */
     BB_REG(GPIOA->odt, 9)  = 0;
     BB_REG(GPIOA->odt, 10) = 0;
-
     while (1)
     {
         /* LED 已点亮，主循环空转保持 */

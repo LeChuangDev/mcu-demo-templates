@@ -55,7 +55,8 @@ AT435_Demo/
 │       └── bsp_delay.c           #   SysTick 毫秒 + DWT 微秒
 │
 ├── App/main.c                    # 示例：PB2 推挽输出，位带翻转（500ms 周期闪烁）
-├── Middlewares/  tools/  Doc/    # 预留空目录
+├── tools/build.cmake             # 编译/烧录统一入口（自动处理工程移动后的缓存失效）
+├── Middlewares/  Doc/            # 预留空目录
 └── build/debug/                  # 编译产物（gitignore）
 ```
 
@@ -102,12 +103,37 @@ PLL：`sclk = HEXT × pll_ns / (pll_ms × pll_fr) = 8M × 144 / (1 × 4) = 288M`
 ## 常用命令
 
 ```bash
+# ★ 推荐：统一入口，自动判断是否需要重新配置
+cmake -P tools/build.cmake                       # 编译（产出 elf/hex/bin + map + 体积打印）
+cmake -DTARGET=flash -P tools/build.cmake        # 编译 + 烧录 + 校验 + 复位
+cmake -DTARGET=debug_server -P tools/build.cmake # GDB Server :3333
+cmake -DTARGET=reset -P tools/build.cmake        # 复位
+
+# 等价的原生命令（工程目录未移动时可用）
 cmake --preset debug                 # 配置
-cmake --build build/debug            # 编译（产出 elf/hex/bin + map + 体积打印）
-cmake --build build/debug --target flash         # 烧录+校验+复位
-cmake --build build/debug --target debug_server  # GDB Server :3333
-cmake --build build/debug --target reset         # 复位
+cmake --build build/debug            # 编译
+cmake --build build/debug --target flash         # 烧录
 ```
+
+### VSCode 快捷键
+
+工程内 `.vscode/tasks.json` 提供两个任务，终端面板始终弹出并实时显示输出：
+
+| 键 | 任务 | 说明 |
+|---|---|---|
+| `F1` / `F7` | 编译 Build | 只编译，不碰芯片 |
+| `F8` | 烧录 Flash | 先增量编译，再 OpenOCD 烧录+校验+复位 |
+
+### 整体移动文件夹
+
+`tools/build.cmake` 每次运行都会核对 `build/debug/CMakeCache.txt` 里记录的源码目录：
+
+- 与当前工程根一致 → 直接增量编译；
+- 不一致（整个文件夹被移动/改名/拷贝）→ 自动删除 `build/debug` 并重新 `cmake --preset debug`。
+
+所以工程可以整个拷到 U 盘、换盘符、换用户名目录，`F7`/`F8` 和多核命令行都不用改。
+其余配置均使用相对路径（`${sourceDir}` / `compile_commands.json` / `.clangd` 的
+`CompilationDatabase: build/debug`），不受移动影响。
 
 ### OpenOCD 烧录（重要）
 
