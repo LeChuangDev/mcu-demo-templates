@@ -1,0 +1,23 @@
+{
+  "clangd.arguments": [
+    // 后台索引：跨文件跳转（main.c -> bsp_led.c、跳进 IDF 头文件）依赖它，缓存落在 .cache/clangd
+    "--background-index",
+    // 索引线程用正常优先级，首次建立索引更快
+    "--background-index-priority=normal",
+    // 补全时包含索引里的全局符号
+    "--all-scopes-completion",
+    // PCH 放内存，避免反复解析庞大的 IDF 头文件
+    "--pch-storage=memory",
+    // 不让 clangd 自动插入 include（ESP-IDF 里 iwyu 容易推荐内部头文件）
+    "--header-insertion=never",
+    // 允许 clangd 向编译数据库里的实际编译器查询系统头文件路径，
+    // 这样 .clangd 不需要写死本机的 xtensa 工具链路径（换电脑无需改配置）
+    "--query-driver=**"
+  ],
+  "clangd.onConfigChanged": "restart",
+  "cmake.configureOnOpen": false,
+  "cmake.configureOnEdit": false,
+  "cmake.automaticReconfigure": false,
+  "cmake.buildDirectory": "${workspaceFolder}/build-cmake-tools",
+  "idf.currentSetup": "C:/Espressif/frameworks/esp-idf-v5.5.5/"
+}

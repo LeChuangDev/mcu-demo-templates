@@ -1,19 +1,14 @@
 # clangd 配置：复用 ESP-IDF 自动生成的编译数据库，实现跨组件补全、头文件跳转与诊断。
-# 编译数据库位于 build/compile_commands.json，每次 idf.py build 时自动生成。
+# 编译数据库位于 build/compile_commands.json，首次 idf.py build 时自动生成。
 #
-# 下面把目标架构与 Xtensa GCC 的系统头文件路径直接写进编译参数，
-# 这样即使编辑器扩展没有传 --query-driver，也不会出现 "stdlib.h not found" 与语法误报。
-# --target 必须保留：否则 clangd 会按 x86_64-windows 解析，FreeRTOS 会走到错误的分支。
+# 这里不写死本机工具链路径：clangd 通过 --query-driver（见 .vscode/settings.json）
+# 向实际编译器查询系统头文件路径，换电脑、换 IDF 版本都不用改配置。
+# 如果使用其它编辑器，需要自行给 clangd 传 --query-driver=**。
+# --target 必须保留：否则 clangd 会按 x86_64 解析，FreeRTOS 会走到错误的分支。
 CompileFlags:
   CompilationDatabase: build
   Add:
     - --target=xtensa-esp-elf
-    - -isystem
-    - C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include
-    - -isystem
-    - C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include-fixed
-    - -isystem
-    - C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/xtensa-esp-elf/include
     - -Wno-unknown-warning-option
   Remove:
     # clang 前缀不认识的 Xtensa / ESP-IDF 专有编译参数

@@ -1,0 +1,13 @@
+{
+  // ===================================================================
+  //  推荐扩展：打开工程时 VS Code 会提示安装
+  //  - clangd        代码补全 / 跳转（读取 build/compile_commands.json）
+  //  - ESP-IDF       可选：菜单配置、调试；不安装也能用 tools/ 里的脚本
+  //  - EditorConfig  统一缩进与换行
+  // ===================================================================
+  "recommendations": [
+    "llvm-vs-code-extensions.vscode-clangd",
+    "espressif.esp-idf-extension",
+    "editorconfig.editorconfig"
+  ]
+}

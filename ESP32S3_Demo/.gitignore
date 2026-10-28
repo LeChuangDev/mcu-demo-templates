@@ -23,6 +23,11 @@ dependencies.lock
 
 # ===== 调试器 / 编辑器 / 系统杂项 =====
 .vscode/ipch/
+# 父仓库的 .gitignore 忽略了 .vscode/，这里放行团队共享的配置
+!.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json
 *.user
 *.bak
 Thumbs.db

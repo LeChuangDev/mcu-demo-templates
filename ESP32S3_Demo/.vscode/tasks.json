@@ -1,0 +1,89 @@
+{
+  // ===================================================================
+  //  ESP-IDF 构建任务
+  //
+  //  所有任务都通过 tools/idf.ps1 先激活 IDF 环境再调用 idf.py，
+  //  因此在 IDE 里点任务即可，不需要事先手动 dot-source export.ps1。
+  //
+  //  入口：Ctrl+Shift+B 直接执行默认的 "IDF: build"；
+  //        其它任务用 Ctrl+Shift+P → Tasks: Run Task 选择。
+  //
+  //  指定串口：本机只接一块板子时 idf.py 会自动选端口；
+  //            要固定端口，在对应任务 args 里加 "-p COM3"（放在 build 之后）。
+  // ===================================================================
+  "version": "2.0.0",
+  "options": {
+    "cwd": "${workspaceFolder}",
+    "shell": {
+      "executable": "powershell.exe",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"]
+    }
+  },
+  "tasks": [
+    {
+      "label": "IDF: build",
+      "type": "shell",
+      "command": "${workspaceFolder}\\tools\\idf.ps1",
+      "args": ["build"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "IDF: flash",
+      "type": "shell",
+      "command": "${workspaceFolder}\\tools\\idf.ps1",
+      "args": ["flash"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "IDF: monitor",
+      "type": "shell",
+      "command": "${workspaceFolder}\\tools\\idf.ps1",
+      "args": ["monitor"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "IDF: build + flash + monitor",
+      "type": "shell",
+      "command": "${workspaceFolder}\\tools\\idf.ps1",
+      "args": ["build", "flash", "monitor"],
+      "problemMatcher": ["$gcc"],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "IDF: menuconfig",
+      "type": "shell",
+      "command": "${workspaceFolder}\\tools\\idf.ps1",
+      "args": ["menuconfig"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "IDF: size",
+      "type": "shell",
+      "command": "${workspaceFolder}\\tools\\idf.ps1",
+      "args": ["size"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "IDF: merge-bin",
+      "type": "shell",
+      "command": "${workspaceFolder}\\tools\\idf.ps1",
+      "args": ["merge-bin"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "IDF: clean",
+      "type": "shell",
+      "command": "${workspaceFolder}\\tools\\idf.ps1",
+      "args": ["fullclean"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    }
+  ]
+}
