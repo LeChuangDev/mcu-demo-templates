@@ -1,0 +1,43 @@
+# clangd 配置：复用 ESP-IDF 自动生成的编译数据库，实现跨组件补全、头文件跳转与诊断。
+# 编译数据库位于 build/compile_commands.json，每次 idf.py build 时自动生成。
+#
+# 下面把目标架构与 Xtensa GCC 的系统头文件路径直接写进编译参数，
+# 这样即使编辑器扩展没有传 --query-driver，也不会出现 "stdlib.h not found" 与语法误报。
+# --target 必须保留：否则 clangd 会按 x86_64-windows 解析，FreeRTOS 会走到错误的分支。
+CompileFlags:
+  CompilationDatabase: build
+  Add:
+    - --target=xtensa-esp-elf
+    - -isystem
+    - C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include
+    - -isystem
+    - C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include-fixed
+    - -isystem
+    - C:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/xtensa-esp-elf/include
+    - -Wno-unknown-warning-option
+  Remove:
+    # clang 前缀不认识的 Xtensa / ESP-IDF 专有编译参数
+    - -mlongcalls
+    - -fno-builtin-memcpy
+    - -fno-builtin-memset
+    - -fno-builtin-bzero
+    - -fno-tree-switch-conversion
+    - -fno-shrink-wrap
+    - -fno-jump-tables
+    - -fstrict-volatile-bitfields
+    - -fmacro-prefix-map=*
+    - -fdiagnostics-color=*
+
+# IncludeCleaner 在 ESP-IDF 这种"头文件层层转包含"的工程里误报很多
+# （会把 driver/gpio.h 里的 esp_err.h、FreeRTOS 的 portmacro.h 之类判成未使用），
+# 关掉它，问题面板只保留真正的编译错误/警告。
+Diagnostics:
+  UnusedIncludes: None
+  MissingIncludes: None
+
+# 索引：头文件跳转 / 跨文件跳转的能力来源
+#   Background: build  -> 后台建索引并持久化到 .cache/clangd/index（配合 --background-index）
+#   StandardLibrary    -> 允许索引标准库符号，Ctrl+点击 stdint.h 里的类型可直接跳转
+Index:
+  Background: build
+  StandardLibrary: true

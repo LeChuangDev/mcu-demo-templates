@@ -1,0 +1,29 @@
+# ===== 构建输出目录（idf.py 全部产物都在这里）=====
+build/
+build-cmake-tools/
+
+# ===== sdkconfig 由 sdkconfig.defaults 生成，含本机串口等配置，不入库 =====
+sdkconfig
+sdkconfig.old
+
+# ===== ESP-IDF 组件管理器产物 =====
+managed_components/
+dependencies.lock
+
+# ===== clangd 后台索引缓存 =====
+.cache/
+
+# ===== 编译中间文件与固件产物（build/ 已覆盖，防止误拷到别处）=====
+*.o
+*.d
+*.map
+*.elf
+*.hex
+*.bin
+
+# ===== 调试器 / 编辑器 / 系统杂项 =====
+.vscode/ipch/
+*.user
+*.bak
+Thumbs.db
+.DS_Store

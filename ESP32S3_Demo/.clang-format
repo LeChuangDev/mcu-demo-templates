@@ -1,0 +1,47 @@
+# =====================================================================
+# .clang-format  —  本工程统一的 C/C++ 代码风格
+# 适用范围：main/、components/ 等自己编写的代码
+# 注意：ESP-IDF 框架源码位于 C:/Espressif/frameworks/...，不在本工程内，
+#       不会受本文件影响；不要把第三方组件复制进来后再整体格式化。
+# 用法：clang-format -i main/**/*.c components/**/*.c components/**/*.h
+# =====================================================================
+
+# 基于 LLVM 风格，再按嵌入式常见习惯（Allman 大括号、4 空格缩进）覆盖
+BasedOnStyle: LLVM
+Language: Cpp
+
+# ---- 缩进 ----
+IndentWidth: 4          # 每层缩进 4 个空格
+TabWidth: 4
+UseTab: Never           # 一律用空格，不允许 Tab
+ContinuationIndentWidth: 4
+
+# ---- 大括号：Allman 风格（左大括号另起一行）----
+BreakBeforeBraces: Allman
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# ---- 指针 / 引用的 * 靠变量名：uint8_t *p ----
+PointerAlignment: Right
+
+# ---- 行宽 ----
+ColumnLimit: 120        # 超过 120 列才换行；0 = 不限制
+
+# ---- 函数返回类型独占一行与否 ----
+AlwaysBreakAfterDefinitionReturnType: None
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+# ---- 头文件排序：手工维护 include 顺序（工程头常有包含依赖）----
+SortIncludes: false
+
+# ---- switch 的 case 与预处理指令缩进 ----
+IndentCaseLabels: true
+IndentPPDirectives: BeforeHash
+
+# ---- 注释 ----
+AlignTrailingComments: true
+SpacesBeforeTrailingComments: 2
+
+# ---- 末尾换行 / 空格清理 ----
+FixNamespaceComments: true
