@@ -1,14 +1,22 @@
 # clangd 配置：复用 ESP-IDF 自动生成的编译数据库，实现跨组件补全、头文件跳转与诊断。
 # 编译数据库位于 build/compile_commands.json，首次 idf.py build 时自动生成。
 #
-# 这里不写死本机工具链路径：clangd 通过 --query-driver（见 .vscode/settings.json）
-# 向实际编译器查询系统头文件路径，换电脑、换 IDF 版本都不用改配置。
-# 如果使用其它编辑器，需要自行给 clangd 传 --query-driver=**。
+# clangd 不是交叉编译器，不会自己去 xtensa 工具链里找标准库头文件。
+# 这里直接把工具链的 3 个系统头文件目录告诉它（路径取自
+#   xtensa-esp32s3-elf-gcc -E -v -xc NUL 的 "search starts here" 列表）：
+# 否则 <stdint.h>/<inttypes.h> 找不到，esp_log.h 里的宏会连带报语法错误。
+# 换电脑 / 换工具链版本时，只需把下面三行路径改成新工具链的对应目录；
+# 也可以先编译一次，再运行 tools/update-clangd.ps1 自动改写。
 # --target 必须保留：否则 clangd 会按 x86_64 解析，FreeRTOS 会走到错误的分支。
+# 注意：不要再在编辑器参数里加 --query-driver，它和 --target 同时存在时
+# 会让 clangd 执行 "gcc --target=..." 提取系统头文件路径并失败。
 CompileFlags:
   CompilationDatabase: build
   Add:
     - --target=xtensa-esp-elf
+    - -isystemC:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include
+    - -isystemC:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/lib/gcc/xtensa-esp-elf/14.2.0/include-fixed
+    - -isystemC:/Espressif/tools/xtensa-esp-elf/esp-14.2.0_20260121/xtensa-esp-elf/xtensa-esp-elf/include
     - -Wno-unknown-warning-option
   Remove:
     # clang 前缀不认识的 Xtensa / ESP-IDF 专有编译参数

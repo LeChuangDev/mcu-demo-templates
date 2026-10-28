@@ -15,7 +15,8 @@ ESP32S3_Demo/
 │  └─ sdkconfig.defaults    工程默认配置（改这里后需 fullclean 才生效）
 ├─ tools/
 │  ├─ idf.ps1               Windows 构建入口（自动查找并激活 ESP-IDF）
-│  └─ idf.sh                Linux / macOS 构建入口
+│  ├─ idf.sh                Linux / macOS 构建入口
+│  └─ update-clangd.ps1     按本机工具链刷新 .clangd 的头文件路径
 ├─ CMakeLists.txt           顶层构建脚本
 └─ README.md
 ```
@@ -114,6 +115,9 @@ chmod +x tools/idf.sh          # 首次需要；如果 git 已记录可执行位
 选择 `IDF: flash`、`IDF: monitor`、`IDF: build + flash + monitor` 等任务。
 串口默认自动选择，要在任务里固定端口，在 `tasks.json` 对应任务的 `args` 里加 `"-p", "COM3"`。
 
+> `.vscode/settings.json` 里的 `idf.currentSetup` 是本机 IDF 路径，只影响 ESP-IDF 扩展的菜单；
+> 换电脑后按需修改或删除，不影响命令行编译和烧录。
+
 ### 常用命令
 
 | 命令 | 作用 |
@@ -180,9 +184,18 @@ Windows 下可在设备管理器查看是否出现 `COMx`。
 或者删除根目录的 `sdkconfig` 再编译。
 
 **clangd 报找不到 `stdlib.h` 等系统头文件**
-先在终端执行一次 `.\tools\idf.ps1 build` 生成 `build/compile_commands.json`，
-再在 VS Code 里执行 `clangd: Restart language server`。
-`.clangd` 已通过 `--query-driver` 自动适配本机工具链，换电脑不用改路径。
+`.clangd` 里显式列出了本机 xtensa 工具链的系统头文件目录。先编译一次生成编译数据库，再执行：
+
+```powershell
+.\tools\update-clangd.ps1
+```
+
+脚本会从 `build/compile_commands.json` 找到实际使用的编译器，自动改写 `.clangd` 里的
+`-isystem` 路径。换电脑或升级 ESP-IDF 后重跑一次即可，最后在 VS Code 里执行
+`clangd: Restart language server`。
+
+> 不要给 clangd 加 `--query-driver`：它会让 clangd 执行 `gcc --target=...`，
+> 而 xtensa-gcc 不认识 `--target`，反而会丢掉全部系统头文件。
 
 **`sdkconfig` 要不要提交？**
 不要。它由 `Config/sdkconfig.defaults` 生成，且包含本机串口等个人配置，已在 `.gitignore` 中排除。

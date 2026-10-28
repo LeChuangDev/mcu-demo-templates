@@ -9,10 +9,10 @@
     // PCH 放内存，避免反复解析庞大的 IDF 头文件
     "--pch-storage=memory",
     // 不让 clangd 自动插入 include（ESP-IDF 里 iwyu 容易推荐内部头文件）
-    "--header-insertion=never",
-    // 允许 clangd 向编译数据库里的实际编译器查询系统头文件路径，
-    // 这样 .clangd 不需要写死本机的 xtensa 工具链路径（换电脑无需改配置）
-    "--query-driver=**"
+    "--header-insertion=never"
+    // 注意：不要加 --query-driver。它会让 clangd 去执行 gcc 提取系统头文件，
+    // 而 .clangd 里的 --target 参数交叉编译器不认，结果系统头文件全部丢失。
+    // 系统头文件路径已在 .clangd 的 -isystem 里显式给出。
   ],
   "clangd.onConfigChanged": "restart",
   "cmake.configureOnOpen": false,
