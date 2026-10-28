@@ -27,6 +27,63 @@
 # python 往 stderr 打的进度信息（PS5 会当成 NativeCommandError）会中断脚本。
 $IdfArgs = $args
 
+# VS Code 任务用 ${config:idf.port} 传串口。把 settings.json 里的 idf.port
+# 清空时可能收到 "-p" 后面没有值、或直接跟着动作名的情况，这里做规范化：
+#   - 端口为空 -> 丢掉该 -p，让 idf.py 恢复自动扫描
+#   - 空字符串参数 -> 丢掉，避免 idf.py 收到空的位置参数
+$IdfActions = @('all', 'app', 'bootloader', 'build', 'clean', 'confserver',
+                'erase-flash', 'erase-otadata', 'flash', 'fullclean', 'gdb',
+                'gdbgui', 'ide', 'lint', 'menuconfig', 'merge-bin', 'monitor',
+                'openocd', 'partition-table', 'reconfigure', 'set-target',
+                'size', 'size-components', 'size-files', 'uf2')
+$cleanArgs = New-Object System.Collections.ArrayList
+for ($i = 0; $i -lt $IdfArgs.Count; $i++) {
+    $arg = [string]$IdfArgs[$i]
+    if ([string]::IsNullOrWhiteSpace($arg)) { continue }
+
+    if ($arg -eq '-p' -or $arg -eq '--port') {
+        $next = ''
+        if ($i + 1 -lt $IdfArgs.Count) { $next = [string]$IdfArgs[$i + 1] }
+        if ([string]::IsNullOrWhiteSpace($next) -or ($IdfActions -contains $next)) {
+            continue   # 端口没填：丢掉 -p，后面的动作照常处理
+        }
+        [void]$cleanArgs.Add($arg)
+        [void]$cleanArgs.Add($next)
+        $i++
+        continue
+    }
+
+    [void]$cleanArgs.Add($arg)
+}
+$IdfArgs = $cleanArgs.ToArray()
+
+# 命令行没写 -p 时，复用 .vscode/settings.json 里的 idf.port（与 VS Code
+# 任务共用同一个配置），省去 idf.py 每次扫描全部串口；显式 -p 优先。
+$HasPortArg = $false
+foreach ($a in $IdfArgs) {
+    if ($a -eq '-p' -or $a -eq '--port') { $HasPortArg = $true; break }
+}
+$UsesSerial = $false
+foreach ($a in $IdfArgs) {
+    if ($a -in @('flash', 'monitor', 'erase-flash', 'erase-otadata', 'encrypted-flash', 'uf2')) {
+        $UsesSerial = $true; break
+    }
+}
+if (-not $HasPortArg -and $UsesSerial) {
+    $settingsFile = Join-Path (Split-Path $PSScriptRoot -Parent) '.vscode\settings.json'
+    if (Test-Path $settingsFile) {
+        $portMatch = Select-String -Path $settingsFile -Pattern '"idf\.port"\s*:\s*"([^"]+)"' -ErrorAction SilentlyContinue |
+                     Select-Object -First 1
+        if ($portMatch) {
+            $configuredPort = $portMatch.Matches[0].Groups[1].Value
+            if (-not [string]::IsNullOrWhiteSpace($configuredPort)) {
+                $IdfArgs = @('-p', $configuredPort) + $IdfArgs
+                Write-Host "[idf.ps1] 串口: $configuredPort（来自 .vscode/settings.json 的 idf.port）" -ForegroundColor DarkGray
+            }
+        }
+    }
+}
+
 # 从 Git Bash / MSYS 环境启动时，MSYSTEM 会让 IDF 的 activate.py 拒绝运行；
 # 官方也不支持在 MSYS 里编译，这里清掉后再激活（普通 PowerShell 下无影响）。
 if ($env:MSYSTEM) { Remove-Item Env:MSYSTEM -ErrorAction SilentlyContinue }

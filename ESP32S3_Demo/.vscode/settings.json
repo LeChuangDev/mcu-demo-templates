@@ -19,5 +19,9 @@
   "cmake.configureOnEdit": false,
   "cmake.automaticReconfigure": false,
   "cmake.buildDirectory": "${workspaceFolder}/build-cmake-tools",
-  "idf.currentSetup": "C:/Espressif/frameworks/esp-idf-v5.5.5/"
+  "idf.currentSetup": "C:/Espressif/frameworks/esp-idf-v5.5.5/",
+  // 烧录/监视使用的串口。VS Code 任务通过 ${config:idf.port} 读取，
+  // 换板子或换 USB 口后改这一行即可（设备管理器 → 端口 (COM 和 LPT)）。
+  // 清空为 "" 则退回 idf.py 自动扫描。
+  "idf.port": "COM11"
 }

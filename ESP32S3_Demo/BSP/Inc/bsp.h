@@ -17,4 +17,9 @@ void bsp_led_on(void);
 void bsp_led_off(void);
 void bsp_led_toggle(void);
 
+/* ---- PWM 测试输出（默认 GPIO4，1 kHz / 50%，用于示波器确认固件在运行）----
+ * 引脚和频率在 BSP/Src/bsp_pwm.c 顶部配置 */
+void bsp_pwm_init(void);
+void bsp_pwm_set_duty(uint8_t percent); /* 占空比 0~100 */
+
 #endif /* __BSP_H */

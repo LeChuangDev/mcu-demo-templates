@@ -1,7 +1,9 @@
 # ESP32-S3 Demo
 
-一个开箱即用的 ESP32-S3 最小工程模板：上电后板载 LED 闪烁，并通过串口每秒打印一次心跳和剩余内存。
-按 **App / BSP / Config** 分层，App 层只依赖 `bsp.h`，方便换板子和继续加功能。
+一个开箱即用的 ESP32-S3 最小工程模板：上电后板载 LED 闪烁，并通过串口每秒打印一次心跳和剩余内存；
+同时输出一路 1 kHz、50% 占空比的 PWM（默认 GPIO4），方便用示波器/逻辑分析仪确认固件已运行。
+按 **App / BSP / Config** 分层，App 层只依赖 `bsp.h`；引脚、频率等板级参数集中在
+`BSP/Src/bsp_config.h`，换板子只改这一个文件。
 
 ## 目录结构
 
@@ -10,7 +12,11 @@ ESP32S3_Demo/
 ├─ main/                    App 层：app_main() 入口
 ├─ BSP/
 │  ├─ Inc/bsp.h             板级接口（App 只能 include 这个文件）
-│  └─ Src/                  LED、延时等板级实现
+│  └─ Src/
+│     ├─ bsp_config.h       ★ 板级配置：LED / PWM 引脚、频率、占空比
+│     ├─ bsp_led.c          LED 实现
+│     ├─ bsp_pwm.c          PWM 测试输出（LEDC）
+│     └─ bsp_delay.c        延时实现
 ├─ Config/
 │  └─ sdkconfig.defaults    工程默认配置（改这里后需 fullclean 才生效）
 ├─ tools/
@@ -112,11 +118,45 @@ chmod +x tools/idf.sh          # 首次需要；如果 git 已记录可执行位
 ### 在 VS Code 里
 
 按 **Ctrl + Shift + B** 直接编译。其它操作按 **Ctrl + Shift + P** → `Tasks: Run Task`，
-选择 `IDF: flash`、`IDF: monitor`、`IDF: build + flash + monitor` 等任务。
-串口默认自动选择，要在任务里固定端口，在 `tasks.json` 对应任务的 `args` 里加 `"-p", "COM3"`。
+选择 `烧录 Flash`、`IDF: monitor`、`IDF: build + flash + monitor` 等任务。
+任务名 `编译 Build` / `烧录 Flash` 与 Templates 下其它工程保持一致，
+同一套键盘快捷键在所有模板工程里通用。
+
+**串口**固定在 `.vscode/settings.json` 的 `idf.port`（默认 `COM11`）：
+
+```jsonc
+"idf.port": "COM11"
+```
+
+烧录和监视任务只连这一个口，不再扫描全部串口，速度明显更快。
+换板子/换 USB 口后改这一行；设为 `""` 则退回自动扫描。
+命令行 `.\tools\idf.ps1 flash` 也读这个配置，显式写的 `-p COM3` 优先。
+`idf.port` 同时是 ESP-IDF 扩展的串口设置，在扩展里选择端口也会写到这里。
 
 > `.vscode/settings.json` 里的 `idf.currentSetup` 是本机 IDF 路径，只影响 ESP-IDF 扩展的菜单；
 > 换电脑后按需修改或删除，不影响命令行编译和烧录。
+
+### 快捷键（可选）
+
+VS Code 的快捷键配置在用户目录，工程本身带不了。推荐用 `Alt+B` 编译、
+`Alt+U` 编译并烧录（B = Build，U = Upload）：单手可操作，焦点在编辑器、终端或资源管理器时
+都生效，不区分大小写，也不占用 VS Code 的默认快捷键。按 **Ctrl+Shift+P** →
+`Preferences: Open Keyboard Shortcuts (JSON)`，把下面两行加到数组里：
+
+```jsonc
+{ "key": "alt+b", "command": "workbench.action.tasks.runTask", "args": "编译 Build" },
+{ "key": "alt+u", "command": "workbench.action.tasks.runTask", "args": "烧录 Flash" }
+```
+
+也可以用 `Shift+Z` / `Shift+X`，但它们是输入大写字母的按键，必须加
+`"when": "!editorTextFocus"` 限制在编辑器外触发，否则编辑器里打不出大写 Z/X：
+
+```jsonc
+{ "key": "shift+z", "command": "workbench.action.tasks.runTask", "args": "编译 Build", "when": "!editorTextFocus" },
+{ "key": "shift+x", "command": "workbench.action.tasks.runTask", "args": "烧录 Flash", "when": "!editorTextFocus" }
+```
+
+其它任务（monitor、menuconfig 等）同理，把 `args` 换成对应任务名即可。
 
 ### 常用命令
 
@@ -154,11 +194,34 @@ python -m esptool --chip esp32s3 -p COM3 -b 460800 write_flash 0x0 build/merged-
 
 | 要改什么 | 改哪里 |
 | --- | --- |
-| LED 引脚、有效电平 | `BSP/Src/bsp_led.c` 顶部的 `BSP_LED_GPIO` / `BSP_LED_ACTIVE_LEVEL` |
+| LED 引脚、有效电平 | `BSP/Src/bsp_config.h` 的 `BSP_LED_GPIO` / `BSP_LED_ACTIVE_LEVEL` |
+| PWM 引脚、频率、占空比 | `BSP/Src/bsp_config.h` 的 `BSP_PWM_GPIO` / `BSP_PWM_FREQ_HZ` / `BSP_PWM_DUTY_PERCENT` |
+| Flash 容量、PSRAM | `Config/sdkconfig.defaults`（见下节） |
 | 延时 / 计时实现 | `BSP/Src/bsp_delay.c` |
 | 板级接口 | `BSP/Inc/bsp.h` |
 | 应用逻辑 | `main/main.c` |
-| 工程默认配置 | `Config/sdkconfig.defaults` |
+
+`bsp_config.h` 是 BSP 内部头文件，只被 BSP 源文件包含；App 层仍然只 `#include "bsp.h"`。
+
+### Flash 容量与 PSRAM
+
+`Config/sdkconfig.defaults` 默认按 **16MB Flash、不开 PSRAM** 配置：
+
+```ini
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+# CONFIG_SPIRAM=y
+# CONFIG_SPIRAM_MODE_OCT=y
+```
+
+- **Flash 容量**：按模组实际容量改成 `_2MB` / `_4MB` / `_8MB` / `_16MB` 对应选项。
+  容量设置偏小不会烧坏，但启动日志会出现
+  `Detected size(16384k) larger than the size in the binary image header(2048k)`，
+  且超过设置大小的空间无法使用。
+- **PSRAM**：N16R8 等带 8MB PSRAM 的模组取消后两行注释；`CONFIG_SPIRAM_MODE_OCT`
+  对应八线 PSRAM（R8），四线（R2）模组改用 `CONFIG_SPIRAM_MODE_QUAD=y`。
+  板子没有 PSRAM 时保持注释，否则启动会失败。
+
+改完执行 `.\tools\idf.ps1 fullclean` 再编译，让默认配置重新生成 `sdkconfig`。
 
 > 部分 ESP32-S3 开发板（如 DevKitC-1 v1.1）板载的是 WS2812 RGB 灯（接 GPIO48），
 > 不能直接用 GPIO 电平控制，需要改用 RMT/LED 驱动，或者外接普通 LED。
@@ -178,6 +241,11 @@ Windows 下可在设备管理器查看是否出现 `COMx`。
 
 **首次编译很慢**
 正常现象。工程已启用 ccache，后续增量编译会快很多。
+
+**启动日志出现 `Detected size larger than the size in the binary image header`**
+固件头里记录的 Flash 容量比芯片实际容量小（例如 16MB 芯片按 2MB 编译）。
+把 `Config/sdkconfig.defaults` 里的 `CONFIG_ESPTOOLPY_FLASHSIZE_*` 改成实际容量，
+然后 `fullclean` 重新编译烧录。不影响功能，但超过设定值的空间用不到。
 
 **改了 `Config/sdkconfig.defaults` 不生效**
 `build/` 建好后不会自动重新读默认配置，执行 `.\tools\idf.ps1 fullclean` 后重新编译；

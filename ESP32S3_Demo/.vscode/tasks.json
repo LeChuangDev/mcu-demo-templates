@@ -5,11 +5,15 @@
   //  所有任务都通过 tools/idf.ps1 先激活 IDF 环境再调用 idf.py，
   //  因此在 IDE 里点任务即可，不需要事先手动 dot-source export.ps1。
   //
-  //  入口：Ctrl+Shift+B 直接执行默认的 "IDF: build"；
+  //  入口：Ctrl+Shift+B 直接执行默认的 "编译 Build"；
   //        其它任务用 Ctrl+Shift+P → Tasks: Run Task 选择。
+  //  快捷键（绑定在 VS Code 用户 keybindings.json，见 README）：
+  //        Alt+B 编译，Alt+U 编译并烧录（U = Upload，单手可操作、任意焦点）。
+  //        Shift+Z / Shift+X 作为非编辑器焦点下的备选。
   //
-  //  指定串口：本机只接一块板子时 idf.py 会自动选端口；
-  //            要固定端口，在对应任务 args 里加 "-p COM3"（放在 build 之后）。
+  //  指定串口：统一读 .vscode/settings.json 里的 "idf.port"（默认 COM11），
+  //            换板子/换 USB 口只改那一行，不用每次让 idf.py 扫描全部串口。
+  //            把 idf.port 设为 "" 则恢复自动扫描。
   // ===================================================================
   "version": "2.0.0",
   "options": {
@@ -21,7 +25,7 @@
   },
   "tasks": [
     {
-      "label": "IDF: build",
+      "label": "编译 Build",
       "type": "shell",
       "command": "${workspaceFolder}\\tools\\idf.ps1",
       "args": ["build"],
@@ -30,18 +34,18 @@
       "presentation": { "reveal": "always", "panel": "shared", "clear": true }
     },
     {
-      "label": "IDF: flash",
+      "label": "烧录 Flash",
       "type": "shell",
       "command": "${workspaceFolder}\\tools\\idf.ps1",
-      "args": ["flash"],
-      "problemMatcher": [],
+      "args": ["-p", "${config:idf.port}", "build", "flash"],
+      "problemMatcher": ["$gcc"],
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
       "label": "IDF: monitor",
       "type": "shell",
       "command": "${workspaceFolder}\\tools\\idf.ps1",
-      "args": ["monitor"],
+      "args": ["-p", "${config:idf.port}", "monitor"],
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
@@ -49,7 +53,7 @@
       "label": "IDF: build + flash + monitor",
       "type": "shell",
       "command": "${workspaceFolder}\\tools\\idf.ps1",
-      "args": ["build", "flash", "monitor"],
+      "args": ["-p", "${config:idf.port}", "build", "flash", "monitor"],
       "problemMatcher": ["$gcc"],
       "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },

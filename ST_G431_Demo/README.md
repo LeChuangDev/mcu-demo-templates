@@ -104,7 +104,8 @@ App  ──►  BSP  ──►  Drivers/External(片外芯片)
 把 `ST_G431_Demo/` 整个文件夹复制或移动到任何位置（路径可以含空格、中文），
 **不需要修改任何配置**，直接用下面的方式编译/烧录：
 
-- VSCode：`Ctrl+Shift+B` 编译；任务“烧录 Flash”会自动先编译再烧录。
+- VSCode：`Alt+B` 编译、`Alt+U` 编译并烧录（单手、任意焦点）；也可以按 `Ctrl+Shift+B`
+  只编译，或在任务面板选择“编译 Build”“烧录 Flash”（“烧录 Flash”会自动先编译再烧录）。
 - 命令行：
   ```bash
   cmake -P tools/build.cmake                    # 编译（debug）

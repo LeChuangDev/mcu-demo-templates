@@ -117,12 +117,15 @@ cmake --build build/debug --target flash         # 烧录
 
 ### VSCode 快捷键
 
-工程内 `.vscode/tasks.json` 提供两个任务，终端面板始终弹出并实时显示输出：
+工程内 `.vscode/tasks.json` 提供两个任务，终端面板始终弹出并实时显示输出。
+Templates 下所有工程使用同一套快捷键（单手可操作、任意焦点生效）：
 
 | 键 | 任务 | 说明 |
 |---|---|---|
-| `F1` / `F7` | 编译 Build | 只编译，不碰芯片 |
-| `F8` | 烧录 Flash | 先增量编译，再 OpenOCD 烧录+校验+复位 |
+| `Alt+B` | 编译 Build | 只编译，不碰芯片 |
+| `Alt+U` | 烧录 Flash | 先增量编译，再 OpenOCD 烧录+校验+复位 |
+| `F1` / `F7` | 编译 Build | 原有功能键，仍可用 |
+| `F8` | 烧录 Flash | 原有功能键，仍可用 |
 
 ### 整体移动文件夹
 
