@@ -39,8 +39,8 @@ Diagnostics:
   MissingIncludes: None
 
 # 索引：头文件跳转 / 跨文件跳转的能力来源
-#   Background: build  -> 后台建索引并持久化到 .cache/clangd/index（配合 --background-index）
+#   Background: Build  -> 后台建索引并持久化到 .cache/clangd/index（配合 --background-index）
 #   StandardLibrary    -> 允许索引标准库符号，Ctrl+点击 stdint.h 里的类型可直接跳转
 Index:
-  Background: build
+  Background: Build
   StandardLibrary: true
