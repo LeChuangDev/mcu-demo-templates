@@ -1,0 +1,16 @@
+# =====================================================================
+#  .clangd —— 让 IDE 语言服务使用主机端编译数据库
+#
+#  模块库和单元测试都按主机 C 编译，真正的编译由 CMake + Ninja 完成。
+#  CMakeLists.txt 已设置 CMAKE_EXPORT_COMPILE_COMMANDS=ON，配置后生成：
+#      build-test/compile_commands.json
+#
+#  clangd 读取该数据库后即可获得每个文件的 -I 路径、-D 宏和 C 标准，
+#  不会再出现 “xxx.h file not found” 或 “unknown type uint8_t”。
+#
+#  注意：Examples/stm32f4/ 下的目标板示例不在主机编译数据库中，
+#        IDE 中可能仍有红线；以 arm-none-eabi-gcc 的实际编译结果为准。
+# =====================================================================
+
+CompileFlags:
+  CompilationDatabase: build-test
